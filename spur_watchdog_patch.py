@@ -136,8 +136,3 @@ class SshShell(spur.SshShell):
 
 atexit.register(LocalShell._atexit_cb)
 atexit.register(SshShell._atexit_cb)
-def _signal_handler(signum, frame):
-    sys.exit(1)
-signal.signal(signal.SIGINT, _signal_handler)
-signal.signal(signal.SIGTERM, _signal_handler)
-signal.signal(signal.SIGQUIT, _signal_handler)
