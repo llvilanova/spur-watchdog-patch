@@ -22,7 +22,7 @@ logger.setLevel(logging.INFO)
 
 # Patch spur to raise SIGINT while waiting for a process (python 2 only)
 
-if sys.version[0] < 3:
+if sys.version_info[0] < 3:
     def _wait_for_result_patch(self):
 	# Python will raise SIGINT between iterations, but not when blocked on
 	# the wait used by _generate_result()
