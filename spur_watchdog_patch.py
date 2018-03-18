@@ -23,6 +23,8 @@ logger.setLevel(logging.INFO)
 # Monitor background processes for failures, so we can error out early, and
 # kill all processes when exiting
 
+_LOCK = threading.RLock()
+
 def _watchdog_thread(obj, cmd_msg):
     stack_info = traceback.extract_stack()
     def watchdog():
@@ -30,6 +32,7 @@ def _watchdog_thread(obj, cmd_msg):
             obj.wait_for_result()
         except Exception as e:
             if not obj._is_killed:
+                _LOCK.acquire()
                 stack_idx = 0 if stack_info[0][2] == "<module>" else 6
                 print("Traceback (most recent call last):")
                 msg = traceback.format_list(stack_info[stack_idx:-1])
@@ -40,6 +43,7 @@ def _watchdog_thread(obj, cmd_msg):
                 print("".join(msg), end="")
                 print("%s.%s: %s" % (exc_type.__module__, exc_type.__name__, exc_value))
                 print("command:", cmd_msg)
+                _LOCK.release()
                 os._exit(1)
         logger.info("-- %s", cmd_msg)
     thread = threading.Thread(target=watchdog)
