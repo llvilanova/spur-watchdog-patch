@@ -17,7 +17,6 @@ import time
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 # Patch spur to raise SIGINT while waiting for a process (python 2 only)
