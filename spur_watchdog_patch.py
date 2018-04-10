@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+# Patch spur to raise SIGINT while waiting for a process (python 2 only)
+
+if sys.version_info[0] < 3:
+    def _wait_for_result_patch(self):
+        # Python will raise SIGINT between iterations, but not when blocked on
+        # the wait used by _generate_result()
+        while self.is_running():
+            time.sleep(.1)
+        if self._result is None:
+            self._result = self._generate_result()
+        return self._result
+    import spur.ssh
+    spur.ssh.SshProcess.wait_for_result = _wait_for_result_patch
+    import spur.local
+    spur.local.LocalProcess.wait_for_result = _wait_for_result_patch
+
+
 # Monitor background processes for failures, so we can error out early, and
 # kill all processes when exiting
 
