@@ -36,6 +36,18 @@ if sys.version_info[0] < 3:
     spur.local.LocalProcess.wait_for_result = _wait_for_result_patch
 
 
+# Patch spur to update the _is_killed attribute when sending signals
+def _patch_send_signal(func):
+    def send_signal_wrapper(self, signum):
+        if signum in [signal.SIGQUIT, signal.SIGKILL]:
+            obj._is_killed = True
+        return func(self, signum)
+import spur.ssh
+spur.ssh.SshProcess.send_signal = _patch_send_signal(spur.ssh.SshProcess.send_signal)
+import spur.local
+spur.local.LocalProcess.send_signal = _patch_send_signal(spur.local.LocalProcess.send_signal)
+
+
 # Monitor background processes for failures, so we can error out early, and
 # kill all processes when exiting
 
