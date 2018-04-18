@@ -40,8 +40,9 @@ if sys.version_info[0] < 3:
 def _patch_send_signal(func):
     def send_signal_wrapper(self, signum):
         if signum in [signal.SIGQUIT, signal.SIGKILL]:
-            obj._is_killed = True
+            self._is_killed = True
         return func(self, signum)
+    return send_signal_wrapper
 import spur.ssh
 spur.ssh.SshProcess.send_signal = _patch_send_signal(spur.ssh.SshProcess.send_signal)
 import spur.local
