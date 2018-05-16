@@ -39,7 +39,7 @@ if sys.version_info[0] < 3:
 # Patch spur to update the _is_killed attribute when sending signals
 def _patch_send_signal(func):
     def send_signal_wrapper(self, signum):
-        if signum in [signal.SIGQUIT, signal.SIGKILL]:
+        if signum in [signal.SIGINT, signal.SIGQUIT, signal.SIGKILL]:
             self._is_killed = True
         return func(self, signum)
     return send_signal_wrapper
