@@ -74,7 +74,7 @@ def _watchdog_thread(obj, cmd_msg):
                 print("command:", cmd_msg)
                 _LOCK.release()
                 os._exit(1)
-        logger.info("-- %s", cmd_msg)
+        logger.info("- %s", cmd_msg)
     thread = threading.Thread(target=watchdog)
     thread.daemon = True
     thread.start()
@@ -100,12 +100,11 @@ class LocalShell(spur.LocalShell):
     def spawn(self, *args, **kwargs):
         cmd = args[0]
         cmd_msg = " ".join(cmd)
-        logger.info("+- %s", cmd_msg)
+        logger.info("+ %s", cmd_msg)
         kill = kwargs.pop("kill", None)
         obj = spur.LocalShell.spawn(self, store_pid=True, *args, **kwargs)
         obj._is_killed = False
         self.__CHILDREN.append((obj, self, kill))
-        logger.info("-+ %s", cmd_msg)
         _watchdog_thread(obj, cmd_msg)
         return obj
 
@@ -133,7 +132,7 @@ class SshShell(spur.SshShell):
 
     def run(self, *args, **kwargs):
         cmd = args[0]
-        cmd_msg = "ssh %s@%s %s" % (self.username, self.hostname, " ".join(cmd))
+        cmd_msg = "ssh -p %d %s@%s %s" % (self._port, self.username, self.hostname, " ".join(cmd))
         logger.info("+ %s", cmd_msg)
         obj = spur.SshShell.spawn(self, store_pid=True, *args, **kwargs)
         self.__CHILDREN.append((obj, self, None))
@@ -143,13 +142,12 @@ class SshShell(spur.SshShell):
 
     def spawn(self, *args, **kwargs):
         cmd = args[0]
-        cmd_msg = "ssh %s@%s %s" % (self.username, self.hostname, " ".join(cmd))
-        logger.info("+- %s", cmd_msg)
+        cmd_msg = "ssh -p %d %s@%s %s" % (self._port, self.username, self.hostname, " ".join(cmd))
+        logger.info("+ %s", cmd_msg)
         kill = kwargs.pop("kill", None)
         obj = spur.SshShell.spawn(self, store_pid=True, *args, **kwargs)
         obj._is_killed = False
         self.__CHILDREN.append((obj, self, kill))
-        logger.info("-+ %s", cmd_msg)
         _watchdog_thread(obj, cmd_msg)
         return obj
 
