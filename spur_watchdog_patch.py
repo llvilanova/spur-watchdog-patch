@@ -118,7 +118,7 @@ class LocalShell(spur.LocalShell):
                 else:
                     try:
                         child.send_signal(signal.SIGKILL)
-                    except spur.results.RunProcessError:
+                    except:
                         pass
 
 class SshShell(spur.SshShell):
@@ -161,7 +161,7 @@ class SshShell(spur.SshShell):
                 else:
                     try:
                         child.send_signal(signal.SIGKILL)
-                    except spur.results.RunProcessError:
+                    except:
                         pass
 
 
