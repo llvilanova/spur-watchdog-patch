@@ -113,13 +113,14 @@ class LocalShell(spur.LocalShell):
         for child, shell, kill in LocalShell.__CHILDREN:
             child._is_killed = True
             if child.is_running():
-                if kill:
-                    shell.run(kill)
-                else:
-                    try:
+                try:
+                    if kill:
+                        shell.run(kill)
+                    else:
                         child.send_signal(signal.SIGKILL)
-                    except:
-                        pass
+                    child.wait_for_result()
+                except:
+                    pass
 
 class SshShell(spur.SshShell):
 
@@ -156,13 +157,14 @@ class SshShell(spur.SshShell):
         for child, shell, kill in SshShell.__CHILDREN:
             child._is_killed = True
             if child.is_running():
-                if kill:
-                    shell.run(kill)
-                else:
-                    try:
+                try:
+                    if kill:
+                        shell.run(kill)
+                    else:
                         child.send_signal(signal.SIGKILL)
-                    except:
-                        pass
+                    child.wait_for_result()
+                except:
+                    pass
 
 
 atexit.register(LocalShell._atexit_cb)
