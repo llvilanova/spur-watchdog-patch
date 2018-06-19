@@ -49,9 +49,9 @@ import spur.local
 spur.local.LocalProcess.send_signal = _patch_send_signal(spur.local.LocalProcess.send_signal)
 
 
-# Monitor background processes for failures, so we can error out early, and
-# kill all processes when exiting
+# Monitor background processes for failures, so we can error out early
 
+_EXITING = False
 _LOCK = threading.RLock()
 
 def _watchdog_thread(obj, cmd_msg):
@@ -60,7 +60,7 @@ def _watchdog_thread(obj, cmd_msg):
         try:
             obj.wait_for_result()
         except Exception as e:
-            if not obj._is_killed:
+            if not obj._is_killed and not _EXITING:
                 _LOCK.acquire()
                 stack_idx = 0 if stack_info[0][2] == "<module>" else 6
                 print("Traceback (most recent call last):")
@@ -110,6 +110,8 @@ class LocalShell(spur.LocalShell):
 
     @staticmethod
     def _atexit_cb():
+        global _EXITING
+        _EXITING = True
         for child, shell, kill in LocalShell.__CHILDREN:
             child._is_killed = True
             if child.is_running():
@@ -154,6 +156,8 @@ class SshShell(spur.SshShell):
 
     @staticmethod
     def _atexit_cb():
+        global _EXITING
+        _EXITING = True
         for child, shell, kill in SshShell.__CHILDREN:
             child._is_killed = True
             if child.is_running():
@@ -167,6 +171,7 @@ class SshShell(spur.SshShell):
                     pass
 
 
+# Kill all remaining processes when exiting
 atexit.register(LocalShell._atexit_cb)
 atexit.register(SshShell._atexit_cb)
 def _signal_handler(signum, frame):
