@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 
 import atexit
+import collections
 import logging
 import os
 import signal
@@ -54,14 +55,14 @@ spur.local.LocalProcess.send_signal = _patch_send_signal(spur.local.LocalProcess
 _EXITING = False
 _LOCK = threading.RLock()
 
-def _watchdog_thread(obj, cmd_msg):
+def _watchdog_thread(shell, obj, cmd_msg, exit_on_error):
     stack_info = traceback.extract_stack()
     def watchdog():
         try:
             obj.wait_for_result()
         except Exception as e:
+            _LOCK.acquire()
             if not obj._is_killed and not _EXITING:
-                _LOCK.acquire()
                 stack_idx = 0 if stack_info[0][2] == "<module>" else 6
                 print("Traceback (most recent call last):")
                 msg = traceback.format_list(stack_info[stack_idx:-1])
@@ -72,8 +73,11 @@ def _watchdog_thread(obj, cmd_msg):
                 print("".join(msg), end="")
                 print("%s.%s: %s" % (exc_type.__module__, exc_type.__name__, exc_value))
                 print("command:", cmd_msg)
-                _LOCK.release()
-                os._exit(1)
+                if exit_on_error:
+                    _LOCK.release()
+                    os._exit(1)
+            shell._child_remove(obj)
+            _LOCK.release()
         logger.info("- %s", cmd_msg)
     thread = threading.Thread(target=watchdog)
     thread.daemon = True
@@ -82,7 +86,13 @@ def _watchdog_thread(obj, cmd_msg):
 
 class LocalShell(spur.LocalShell):
 
-    __CHILDREN = []
+    __CHILDREN = collections.OrderedDict()
+
+    def _child_add(self, obj, kill):
+        LocalShell.__CHILDREN[obj] = (self, kill)
+
+    def _child_remove(self, obj):
+        del LocalShell.__CHILDREN[obj]
 
     def __init__(self, *args, **kwargs):
         spur.LocalShell.__init__(self, *args, **kwargs)
@@ -92,27 +102,29 @@ class LocalShell(spur.LocalShell):
         cmd_msg = " ".join(cmd)
         logger.info("+ %s", cmd_msg)
         obj = spur.LocalShell.spawn(self, store_pid=True, *args, **kwargs)
-        self.__CHILDREN.append((obj, self, None))
+        self._child_add(obj, None)
         res = obj.wait_for_result()
+        self._child_remove(obj)
         logger.info("- %s", cmd_msg)
         return res
 
     def spawn(self, *args, **kwargs):
+        exit_on_error = kwargs.pop("exit_on_error", True)
         cmd = args[0]
         cmd_msg = " ".join(cmd)
         logger.info("+ %s", cmd_msg)
         kill = kwargs.pop("kill", None)
         obj = spur.LocalShell.spawn(self, store_pid=True, *args, **kwargs)
         obj._is_killed = False
-        self.__CHILDREN.append((obj, self, kill))
-        _watchdog_thread(obj, cmd_msg)
+        self._child_add(obj, kill)
+        _watchdog_thread(self, obj, cmd_msg, exit_on_error)
         return obj
 
     @staticmethod
     def _atexit_cb():
         global _EXITING
         _EXITING = True
-        for child, shell, kill in LocalShell.__CHILDREN:
+        for child, (shell, kill) in LocalShell.__CHILDREN.items():
             child._is_killed = True
             if child.is_running():
                 try:
@@ -126,7 +138,13 @@ class LocalShell(spur.LocalShell):
 
 class SshShell(spur.SshShell):
 
-    __CHILDREN = []
+    __CHILDREN = collections.OrderedDict()
+
+    def _child_add(self, obj, kill):
+        SshShell.__CHILDREN[obj] = (self, kill)
+
+    def _child_remove(self, obj):
+        del SshShell.__CHILDREN[obj]
 
     def __init__(self, *args, **kwargs):
         spur.SshShell.__init__(self, *args, **kwargs)
@@ -138,27 +156,29 @@ class SshShell(spur.SshShell):
         cmd_msg = "ssh -p %d %s@%s %s" % (self._port, self.username, self.hostname, " ".join(cmd))
         logger.info("+ %s", cmd_msg)
         obj = spur.SshShell.spawn(self, store_pid=True, *args, **kwargs)
-        self.__CHILDREN.append((obj, self, None))
+        self._child_add(obj, None)
         res = obj.wait_for_result()
+        self._child_remove(obj)
         logger.info("- %s", cmd_msg)
         return res
 
     def spawn(self, *args, **kwargs):
+        exit_on_error = kwargs.pop("exit_on_error", True)
         cmd = args[0]
         cmd_msg = "ssh -p %d %s@%s %s" % (self._port, self.username, self.hostname, " ".join(cmd))
         logger.info("+ %s", cmd_msg)
         kill = kwargs.pop("kill", None)
         obj = spur.SshShell.spawn(self, store_pid=True, *args, **kwargs)
         obj._is_killed = False
-        self.__CHILDREN.append((obj, self, kill))
-        _watchdog_thread(obj, cmd_msg)
+        self._child_add(obj, kill)
+        _watchdog_thread(self, obj, cmd_msg, exit_on_error)
         return obj
 
     @staticmethod
     def _atexit_cb():
         global _EXITING
         _EXITING = True
-        for child, shell, kill in SshShell.__CHILDREN:
+        for child, (shell, kill) in SshShell.__CHILDREN.items():
             child._is_killed = True
             if child.is_running():
                 try:
